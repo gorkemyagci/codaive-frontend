@@ -46,7 +46,7 @@ const Forgot = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-500 via-blue-600 to-cyan-500 text-white font-semibold rounded-md text-base transition hover:from-blue-600 hover:via-blue-700 hover:to-cyan-600 shadow-lg">Send Reset Link</Button>
+              <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-500 via-blue-600 to-cyan-500 text-white font-semibold rounded-md text-base transition hover:from-blue-600 hover:via-blue-700 hover:to-cyan-600 shadow-lg">Send</Button>
             </form>
           </Form>
         )}
