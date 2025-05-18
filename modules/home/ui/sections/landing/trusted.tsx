@@ -13,16 +13,16 @@ const companies = [
 
 const Trusted = () => {
   return (
-    <section className="relative py-20 sm:py-32 overflow-hidden">
-      <div className="container mx-auto relative z-10">
+    <section className="relative py-12 sm:py-20 md:py-32 overflow-hidden">
+      <div className="container mx-auto relative z-10 px-2 sm:px-0">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Trusted by developers at{" "}
             <span className="bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">
               leading companies
             </span>
           </h2>
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-8">
+          <div className="mt-8 sm:mt-12 flex flex-wrap items-center justify-center gap-4 sm:gap-8">
             {companies.map((company) => (
               <motion.div
                 key={company.name}
@@ -30,7 +30,7 @@ const Trusted = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
                 viewport={{ once: true }}
-                className="relative h-8 w-32 grayscale transition-all duration-300 hover:grayscale-0 hover:scale-110 hover:brightness-110"
+                className="relative h-8 w-20 sm:w-32 grayscale transition-all duration-300 hover:grayscale-0 hover:scale-110 hover:brightness-110"
               >
                 {company.name === "Vercel" && <Icons.vercel className="h-8 w-8" />}
                 {company.name === "GitHub" && <Icons.github className="h-8 w-8" />}
@@ -47,7 +47,7 @@ const Trusted = () => {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
           viewport={{ once: true }}
-          className="mx-auto mt-16 max-w-3xl"
+          className="mx-auto mt-10 sm:mt-16 max-w-3xl px-2 sm:px-0"
         >
           <Blockquote className="text-center relative">
             <div className="absolute inset-0 rounded-2xl -z-10" />

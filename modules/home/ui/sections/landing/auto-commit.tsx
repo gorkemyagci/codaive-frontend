@@ -23,15 +23,15 @@ const steps = [
 
 const AutoCommit = () => {
   return (
-    <section className="py-20 sm:py-32">
-      <div className="container mx-container">
-        <div className="grid gap-12 lg:grid-cols-2 lg:gap-20">
+    <section className="py-12 sm:py-20 md:py-32">
+      <div className="container mx-container px-2 sm:px-0">
+        <div className="w-full grid gap-8 sm:gap-12 lg:grid-cols-2 lg:gap-20">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
             viewport={{ once: true }}
-            className="relative"
+            className="relative hidden lg:block"
           >
             <div className="relative rounded-xl border bg-gradient-to-br from-card via-background to-card/80 p-4 shadow-2xl">
               <div className="absolute right-3 top-3 flex gap-2">
@@ -68,7 +68,7 @@ Description: This PR adds a complete authentication system with JWT...`}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               viewport={{ once: true }}
-              className="absolute -bottom-6 -right-4 z-10 max-w-full rounded-xl border-2 border-blue-500/60 bg-gradient-to-br from-blue-900/80 via-blue-800/60 to-card/80 p-4 shadow-2xl ring-2 ring-blue-400/30 backdrop-blur-md"
+              className="absolute hidden lg:block -bottom-6 -right-4 z-10 max-w-full rounded-xl border-2 border-blue-500/60 bg-gradient-to-br from-blue-900/80 via-blue-800/60 to-card/80 p-4 shadow-2xl ring-2 ring-blue-400/30 backdrop-blur-md"
             >
               <div className="flex items-center gap-2 border-b border-blue-400/30 pb-2">
                 <Sparkles className="h-4 w-4 text-blue-400 animate-pulse" />
@@ -94,7 +94,7 @@ Suggested PR description:
             whileInView={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
             viewport={{ once: true }}
-            className="flex flex-col justify-center"
+            className="flex flex-col justify-center mt-8 sm:mt-0"
           >
             <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               AI-Powered Git Workflow
@@ -124,7 +124,7 @@ Suggested PR description:
             </div>
 
             <div className="mt-8">
-              <Button size="lg" className="rounded-full">
+              <Button size="lg" className="rounded-full font-semibold">
                 Try AI Git Features
                 <Sparkles className="ml-2 h-4 w-4" />
               </Button>

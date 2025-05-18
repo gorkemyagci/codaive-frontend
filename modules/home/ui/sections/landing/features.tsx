@@ -1,48 +1,26 @@
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { features } from "@/lib/mockData";
 import { motion } from "framer-motion";
 import { Brain, Terminal, GitBranch, FileCode } from "lucide-react";
 
-const features = [
-  {
-    title: "AI Code Completion",
-    description: "Powered by GPT-4 and Claude, get intelligent code suggestions and completions in real-time.",
-    icon: Brain,
-  },
-  {
-    title: "Integrated Terminal",
-    description: "Full-featured terminal powered by Docker and WebSocket for seamless development.",
-    icon: Terminal,
-  },
-  {
-    title: "GitHub Integration",
-    description: "Automatic commits, PR creation, and seamless GitHub workflow integration.",
-    icon: GitBranch,
-  },
-  {
-    title: "Real-time File System",
-    description: "Edit and manage your project files in real-time with a familiar interface.",
-    icon: FileCode,
-  },
-];
-
 const Features = () => {
   return (
-    <section className="relative py-20 sm:py-32 overflow-hidden">
-      <div className="container mx-container relative z-10">
+    <section className="relative py-12 sm:py-20 md:py-32 overflow-hidden">
+      <div className="container mx-container relative z-10 px-2 sm:px-0">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Everything you need to code, in{" "}
             <span className="bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">
               one place
             </span>
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
+          <p className="mt-3 sm:mt-4 text-base sm:text-lg text-muted-foreground">
             Codaive combines powerful development tools with AI assistance to make coding faster and more efficient.
           </p>
         </div>
 
-        <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 sm:mt-16 flex flex-col sm:flex-row justify-between gap-4 sm:gap-5 max-w-full sm:max-w-5xl mx-auto">
           {features.map((feature, index) => (
             <motion.div
               key={feature.title}
@@ -67,7 +45,7 @@ const Features = () => {
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="text-base text-muted-foreground">
-                    {feature.description}
+                    {feature.desc}
                   </CardDescription>
                 </CardContent>
               </Card>

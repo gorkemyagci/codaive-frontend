@@ -5,9 +5,9 @@ import { ArrowRight, Terminal, Code2, Package } from "lucide-react";
 
 const BuildSoftware = () => {
     return (
-        <section className="py-20 sm:py-32">
-            <div className="container mx-container">
-                <div className="w-full grid gap-12 lg:grid-cols-2 lg:gap-20">
+        <section className="py-12 sm:py-20 md:py-32">
+            <div className="container mx-container px-2 sm:px-0">
+                <div className="w-full grid gap-8 sm:gap-12 lg:grid-cols-2 lg:gap-20">
                     <motion.div
                         initial={{ opacity: 0, x: -20 }}
                         whileInView={{ opacity: 1, x: 0 }}
@@ -15,15 +15,15 @@ const BuildSoftware = () => {
                         viewport={{ once: true }}
                         className="flex flex-col justify-center"
                     >
-                        <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                            Run full projects in your browser
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+                            Run your projects in your browser
                         </h2>
-                        <p className="mt-6 text-lg text-muted-foreground">
+                        <p className="mt-4 sm:mt-6 text-base sm:text-lg text-muted-foreground">
                             Codaive provides a complete development environment with Docker containers,
                             allowing you to run any Node.js, Next.js, or other project directly in your browser.
                         </p>
 
-                        <div className="mt-8 space-y-4">
+                        <div className="mt-6 sm:mt-8 space-y-4">
                             <div className="flex items-start gap-4">
                                 <Terminal className="mt-1 h-5 w-5 text-primary" />
                                 <div>
@@ -55,8 +55,8 @@ const BuildSoftware = () => {
                             </div>
                         </div>
 
-                        <div className="mt-8">
-                            <Button size="lg" className="rounded-full">
+                        <div className="mt-6 sm:mt-8">
+                            <Button size="lg" className="w-full sm:w-auto rounded-full">
                                 Try it now
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
@@ -68,7 +68,7 @@ const BuildSoftware = () => {
                         whileInView={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5 }}
                         viewport={{ once: true }}
-                        className="relative"
+                        className="relative mt-8 sm:mt-0 hidden lg:block"
                     >
                         <div className="relative rounded-xl border bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-4 shadow-2xl ring-2 ring-primary/10 backdrop-blur-md">
                             <div className="absolute right-3 top-3 flex gap-2">
@@ -80,19 +80,19 @@ const BuildSoftware = () => {
                                 <Terminal className="h-4 w-4 text-primary" />
                                 <span className="text-sm text-primary font-semibold">Terminal</span>
                             </div>
-                                <pre className="overflow-x-auto mt-2 text-xs font-mono text-left text-zinc-100 bg-transparent">
-                                    <code>
-                                        <span className="text-green-400">$ npm create next-app@latest my-project</span>
-                                        {"\n"}
-                                        <span className="text-green-400">$ cd my-project</span>
-                                        {"\n"}
-                                        <span className="text-green-400">$ npm run dev</span>
-                                        {"\n\n"}
-                                        <span className="text-cyan-400">&gt; Ready in 300ms - Local: http://localhost:3000</span>
-                                        {"\n"}
-                                        <span className="text-cyan-400">&gt; Ready in 300ms - Network: http://192.168.1.100:3000</span>
-                                    </code>
-                                </pre>
+                            <pre className="overflow-x-auto mt-2 text-xs font-mono text-left text-zinc-100 bg-transparent">
+                                <code>
+                                    <span className="text-green-400">$ npm create next-app@latest my-project</span>
+                                    {"\n"}
+                                    <span className="text-green-400">$ cd my-project</span>
+                                    {"\n"}
+                                    <span className="text-green-400">$ npm run dev</span>
+                                    {"\n\n"}
+                                    <span className="text-cyan-400">&gt; Ready in 300ms - Local: http://localhost:3000</span>
+                                    {"\n"}
+                                    <span className="text-cyan-400">&gt; Ready in 300ms - Network: http://192.168.1.100:3000</span>
+                                </code>
+                            </pre>
                         </div>
 
                         <div className="absolute top-[11.5rem] -right-12 rounded-xl border bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 p-4 shadow-2xl ring-2 ring-primary/10 backdrop-blur-md">

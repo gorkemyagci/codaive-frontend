@@ -1,8 +1,11 @@
 "use client";
 import { Button } from "@/components/ui/button";
+import pageUrls from "@/lib/enums/page-urls";
 import { motion } from "framer-motion";
-import { Code2, Menu } from "lucide-react";
+import { Code2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+import MobileHeader from "./mobile-header";
 
 const navigation = [
   { name: "Features", href: "#features" },
@@ -11,6 +14,8 @@ const navigation = [
 ];
 
 const Header = () => {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <header className="fixed top-0 z-50 w-full border-b bg-background/80 backdrop-blur-sm">
       <nav className="container mx-auto flex h-16 items-center justify-between">
@@ -50,20 +55,18 @@ const Header = () => {
           className="flex items-center gap-4"
         >
           <div className="hidden md:flex md:items-center md:gap-4">
-            <Button variant="ghost" size="sm">
-              Sign In
-            </Button>
-            <Button size="sm" className="rounded-full">
-              Start Coding
-            </Button>
+            <Link href={pageUrls.AUTH.SIGN_IN} prefetch>
+              <Button variant="ghost" size="sm">
+                Sign In
+              </Button>
+            </Link>
+            <Link href={pageUrls.AUTH.SIGN_UP} prefetch>
+              <Button size="sm" className="rounded-full">
+                Start Coding
+              </Button>
+            </Link>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+          <MobileHeader navigation={navigation} isOpen={isOpen} setIsOpen={setIsOpen} />
         </motion.div>
       </nav>
     </header>
