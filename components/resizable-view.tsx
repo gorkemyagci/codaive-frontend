@@ -61,7 +61,7 @@ export function ResizableView({
   return (
     <aside
       style={{ width: size, minWidth: min, maxWidth: max }}
-      className={`flex-shrink-0 min-h-0 flex flex-col relative select-none ${className}`}
+      className={`shrink-0 min-h-0 flex flex-col relative select-none ${className}`}
     >
       {children}
       <div
