@@ -24,6 +24,7 @@ const TerminalComponent = () => {
       theme: { background: "#18181b", foreground: "#e4e4e7" },
       cursorBlink: true,
       fontFamily: 'Menlo, Monaco, "Liberation Mono", "Courier New", monospace',
+      rows: 20
     });
     term.open(containerRef.current);
     term.writeln("Welcome to AI Terminal!");
@@ -111,6 +112,28 @@ const TerminalComponent = () => {
     };
   }, [cwd]);
 
+  useEffect(() => {
+    if (!containerRef.current || !xtermRef.current) return;
+
+    const handleResize = () => {
+      const container = containerRef.current!;
+      const term = xtermRef.current!;
+      // Her satırın px yüksekliği: fontSize * lineHeight (yaklaşık 1.2)
+      const fontSize = 14;
+      const lineHeight = 1.2;
+      const rowHeight = fontSize * lineHeight;
+      const rows = Math.floor(container.offsetHeight / rowHeight);
+      const cols = Math.floor(container.offsetWidth / 8); // 8px: monospace char width approx
+      if (rows > 0 && cols > 0) {
+        term.resize(cols, rows);
+      }
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Komutları simüle et
   const handleCommand = (term: XTerm, command: string) => {
     const [cmd, ...args] = command.trim().split(" ");
@@ -170,7 +193,7 @@ const TerminalComponent = () => {
   };
 
   return (
-    <div className="flex flex-col bg-background border-t" style={{ height: "100px" }}>
+    <div className="flex flex-col bg-background border-t min-h-0">
       <TerminalControls
         onClear={handleClear}
         onCopy={handleCopy}
@@ -179,8 +202,7 @@ const TerminalComponent = () => {
       />
       <div
         ref={containerRef}
-        className="w-full flex-1"
-        style={{ minHeight: 0 }}
+        className="flex-1 min-h-0"
       />
     </div>
   );

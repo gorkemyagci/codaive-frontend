@@ -1,5 +1,6 @@
 "use client";
 import { Editor } from "@monaco-editor/react";
+import EditorLoading from "../components/editor-loading";
 
 const CodeEditor = () => {
     return <div className="h-full w-full">
@@ -12,6 +13,7 @@ const CodeEditor = () => {
             height="100%"
             theme="vs-dark"
             language="javascript"
+            loading={<EditorLoading />}
         />
     </div>;
 };

@@ -138,3 +138,7 @@
     @apply bg-background text-foreground;
   }
 }
+
+.no-scrollbar::-webkit-scrollbar {
+  width: 0px;
+}

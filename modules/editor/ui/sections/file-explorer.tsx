@@ -1,82 +1,22 @@
 "use client"
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ChevronDown, ChevronRight, Folder, FolderOpen, FileText, Plus, MoreVertical, Trash2, Edit2, Check, X } from "lucide-react";
+import { cn, generateId } from "@/lib/utils";
+import { NodeType } from "@/lib/types";
+import { Icons } from "@/components/icons";
 
-interface FileNode {
-  id: string;
-  type: "file";
-  name: string;
-}
-interface FolderNode {
-  id: string;
-  type: "folder";
-  name: string;
-  children: NodeType[];
-}
-type NodeType = FileNode | FolderNode;
-
-const initialTree: NodeType[] = [
-  {
-    id: "1",
-    type: "folder",
-    name: "src",
-    children: [
-      { id: "2", type: "file", name: "index.tsx" },
-      { id: "3", type: "file", name: "app.tsx" },
-      {
-        id: "4",
-        type: "folder",
-        name: "components",
-        children: [
-          { id: "5", type: "file", name: "Button.tsx" },
-        ],
-      },
-    ],
-  },
-  { id: "6", type: "file", name: "package.json" },
-];
-
-function generateId() {
-  return Math.random().toString(36).substr(2, 9);
-}
-
-// Dosya uzantısına göre ikon döndür
 function getFileIcon(name: string) {
-  if (name.endsWith('.tsx')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-cyan-400"><svg width="16" height="16" viewBox="0 0 32 32" fill="none"><ellipse cx="16" cy="16" rx="2.5" ry="2.5" fill="#06b6d4"/><ellipse cx="16" cy="16" rx="10" ry="4.5" stroke="#06b6d4" strokeWidth="2"/><ellipse cx="16" cy="16" rx="10" ry="4.5" stroke="#06b6d4" strokeWidth="2" transform="rotate(60 16 16)"/><ellipse cx="16" cy="16" rx="10" ry="4.5" stroke="#06b6d4" strokeWidth="2" transform="rotate(120 16 16)"/></svg></span>;
-  }
-  if (name.endsWith('.ts')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-blue-500 font-bold text-[10px]">TS</span>;
-  }
-  if (name.endsWith('.js')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-yellow-400 font-bold text-[10px]">JS</span>;
-  }
-  if (name.endsWith('.py')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-yellow-300">🐍</span>;
-  }
-  if (name.endsWith('.json')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-orange-400 font-bold text-[10px]">{`{}`}</span>;
-  }
-  if (name.endsWith('.md')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-gray-400 font-bold text-[10px]">MD</span>;
-  }
-  if (name.endsWith('.css')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-pink-400">🎨</span>;
-  }
-  if (name.endsWith('.html')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-red-400">🌐</span>;
-  }
-  if (name.endsWith('.sh')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-green-400"></span>; // terminal/komut satırı ikonu (nerd font veya emoji)
-  }
-  if (name.endsWith('.env')) {
-    return <span className="w-4 h-4 mr-1 flex items-center justify-center text-lime-400">🔑</span>;
-  }
-  return <FileText className="w-4 h-4 text-blue-400 mr-1" />;
+  let iconName: keyof typeof Icons = name as keyof typeof Icons;
+  const icon = iconName.split(".")[1];
+  const IconComponent = Icons[icon as keyof typeof Icons];
+  const whiteIcons = ['json'];
+  return <IconComponent className={cn("w-4 h-4 mr-1", {
+    "text-white fill-white": whiteIcons.includes(icon)
+  })} />
 }
 
 const FileExplorer = () => {
-  const [tree, setTree] = useState<NodeType[]>(initialTree);
+  const [tree, setTree] = useState<NodeType[]>([]);
   const [expanded, setExpanded] = useState<{ [key: string]: boolean }>({});
   const [adding, setAdding] = useState<{ parentId: string | null; type: "file" | "folder" | null }>({ parentId: null, type: null });
   const [newName, setNewName] = useState("");
@@ -84,6 +24,8 @@ const FileExplorer = () => {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [contextMenuId, setContextMenuId] = useState<string | null>(null);
+  const [emptyMenu, setEmptyMenu] = useState<{ x: number; y: number; show: boolean }>({ x: 0, y: 0, show: false });
+  const explorerRef = useRef<HTMLDivElement>(null);
 
   const toggle = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -92,6 +34,7 @@ const FileExplorer = () => {
   const handleAdd = (parentId: string | null, type: "file" | "folder") => {
     setAdding({ parentId, type });
     setNewName("");
+    setEmptyMenu({ x: 0, y: 0, show: false });
   };
 
   const handleAddConfirm = () => {
@@ -186,6 +129,15 @@ const FileExplorer = () => {
 
   const handleCloseContextMenu = () => setContextMenuId(null);
 
+  // Empty area context menu
+  const handleEmptyContextMenu = (e: React.MouseEvent) => {
+    if (e.target === explorerRef.current) {
+      e.preventDefault();
+      setEmptyMenu({ x: e.clientX, y: e.clientY, show: true });
+    }
+  };
+  const closeEmptyMenu = () => setEmptyMenu({ x: 0, y: 0, show: false });
+
   const renderNode = (node: NodeType, parentId: string | null = null, depth = 0) => {
     const isFolder = node.type === "folder";
     const isSelected = selectedId === node.id;
@@ -193,10 +145,11 @@ const FileExplorer = () => {
     return (
       <div key={node.id} className="group flex flex-col relative">
         <div
-          className={`flex items-center h-7 rounded cursor-pointer relative text-[13px] font-medium ${
-            isSelected ? "bg-zinc-800 text-white/70" : "hover:bg-[#23272e]"
-          }`}
-          style={{ paddingLeft: 4 + depth * 16 }}
+          className={cn(
+            "flex items-center h-7 rounded cursor-pointer relative text-[13px] font-medium transition-colors",
+            isSelected ? "bg-zinc-800 text-white/80 shadow-sm" : "hover:bg-zinc-700/40"
+          )}
+          style={{ paddingLeft: depth ? 8 + depth * 16 : 8 }}
           onClick={() => handleSelect(node.id)}
           onContextMenu={e => handleContextMenu(e, node.id)}
         >
@@ -206,7 +159,7 @@ const FileExplorer = () => {
               {expanded[node.id] ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
             </span>
           ) : (
-            <span className="w-4 mr-1" />
+            <></>
           )}
           {/* Klasör/dosya ikonları */}
           {isFolder ? (
@@ -287,19 +240,24 @@ const FileExplorer = () => {
 
   // Kökte yeni dosya/klasör ekleme
   return (
-    <div className="p-2 text-xs select-none h-full">
+    <div
+      ref={explorerRef}
+      className="p-2 text-xs select-none h-full bg-zinc-900/90 border border-zinc-800 shadow-lg relative overflow-auto"
+      onContextMenu={handleEmptyContextMenu}
+      onClick={closeEmptyMenu}
+    >
       <div className="flex items-center mb-2 gap-1">
         <span className="font-semibold text-foreground tracking-wider text-[13px]">EXPLORER</span>
         <button
           className="ml-auto p-1 rounded hover:bg-muted"
-          onClick={() => handleAdd(null, "file")}
+          onClick={e => { e.stopPropagation(); handleAdd(null, "file"); }}
           title="Kökte dosya ekle"
         >
           <Plus className="w-4 h-4" />
         </button>
         <button
           className="p-1 rounded hover:bg-muted"
-          onClick={() => handleAdd(null, "folder")}
+          onClick={e => { e.stopPropagation(); handleAdd(null, "folder"); }}
           title="Kökte klasör ekle"
         >
           <Folder className="w-4 h-4" />
@@ -326,9 +284,23 @@ const FileExplorer = () => {
           />
         </div>
       )}
-      <div className="space-y-1 mt-2">
+      <div className="space-y-1 mt-2 min-h-[40px]">
+        {tree.length === 0 && (
+          <div className="text-zinc-500 text-xs flex items-center justify-center h-10 italic">No files or folders</div>
+        )}
         {tree.map((node) => renderNode(node, null, 0))}
       </div>
+      {/* Empty area context menu */}
+      {emptyMenu.show && (
+        <div
+          className="fixed z-50 min-w-[140px] bg-zinc-900 border border-zinc-700 rounded shadow-lg py-1 text-xs"
+          style={{ left: emptyMenu.x, top: emptyMenu.y }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button className="flex items-center w-full px-3 py-1 hover:bg-zinc-800" onClick={() => handleAdd(null, "file")}> <Plus className="w-3 h-3 mr-2" /> Yeni dosya</button>
+          <button className="flex items-center w-full px-3 py-1 hover:bg-zinc-800" onClick={() => handleAdd(null, "folder")}> <Folder className="w-3 h-3 mr-2" /> Yeni klasör</button>
+        </div>
+      )}
     </div>
   );
 };
