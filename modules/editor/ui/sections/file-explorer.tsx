@@ -1,5 +1,5 @@
 "use client"
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight, Folder, FolderOpen, FileText, Plus, MoreVertical, Trash2, Edit2, Check, X } from "lucide-react";
 import { cn, generateId } from "@/lib/utils";
 import { NodeType } from "@/lib/types";
@@ -15,8 +15,12 @@ function getFileIcon(name: string) {
   })} />
 }
 
-const FileExplorer = () => {
-  const [tree, setTree] = useState<NodeType[]>([]);
+interface FileExplorerProps {
+  tree: NodeType[];
+  setTree: React.Dispatch<React.SetStateAction<NodeType[]>>;
+}
+
+const FileExplorer = ({ tree, setTree }: FileExplorerProps) => {
   const [expanded, setExpanded] = useState<{ [key: string]: boolean }>({});
   const [adding, setAdding] = useState<{ parentId: string | null; type: "file" | "folder" | null }>({ parentId: null, type: null });
   const [newName, setNewName] = useState("");
@@ -26,6 +30,10 @@ const FileExplorer = () => {
   const [contextMenuId, setContextMenuId] = useState<string | null>(null);
   const [emptyMenu, setEmptyMenu] = useState<{ x: number; y: number; show: boolean }>({ x: 0, y: 0, show: false });
   const explorerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    console.log(tree);
+  }, [tree]);
 
   const toggle = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -43,6 +51,33 @@ const FileExplorer = () => {
       setNewName("");
       return;
     }
+
+    const nameExists = (nodes: NodeType[], parentId: string | null): boolean => {
+      if (parentId === null) {
+        return nodes.some(node => node.name === newName);
+      }
+
+      const findInNodes = (nodesArr: NodeType[]): boolean => {
+        for (const node of nodesArr) {
+          if (node.id === parentId && node.type === "folder") {
+            return node.children ? node.children.some(child => child.name === newName) : false;
+          }
+          if (node.type === "folder" && node.children) {
+            const found = findInNodes(node.children);
+            if (found) return true;
+          }
+        }
+        return false;
+      };
+      
+      return findInNodes(nodes);
+    };
+
+    if (nameExists(tree, adding.parentId)) {
+      alert(`A file or folder with the name "${newName}" already exists in this location.`);
+      return;
+    }
+
     const addToTree = (nodes: NodeType[]): NodeType[] => {
       return nodes.map((node) => {
         if (node.id === adding.parentId && node.type === "folder") {
@@ -129,7 +164,6 @@ const FileExplorer = () => {
 
   const handleCloseContextMenu = () => setContextMenuId(null);
 
-  // Empty area context menu
   const handleEmptyContextMenu = (e: React.MouseEvent) => {
     if (e.target === explorerRef.current) {
       e.preventDefault();
@@ -153,7 +187,6 @@ const FileExplorer = () => {
           onClick={() => handleSelect(node.id)}
           onContextMenu={e => handleContextMenu(e, node.id)}
         >
-          {/* Klasör aç/kapa oku */}
           {isFolder ? (
             <span onClick={e => { e.stopPropagation(); toggle(node.id); }} className="mr-1 flex items-center w-4">
               {expanded[node.id] ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
@@ -161,7 +194,6 @@ const FileExplorer = () => {
           ) : (
             <></>
           )}
-          {/* Klasör/dosya ikonları */}
           {isFolder ? (
             expanded[node.id] ? <FolderOpen className="w-4 h-4 text-yellow-400 mr-1" /> : <Folder className="w-4 h-4 text-yellow-400 mr-1" />
           ) : (
@@ -182,7 +214,6 @@ const FileExplorer = () => {
           ) : (
             <span className="flex-1 truncate select-none" onDoubleClick={() => isFolder && toggle(node.id)}>{node.name}</span>
           )}
-          {/* Sağ üç nokta menüsü */}
           <button
             className="opacity-0 group-hover:opacity-100 ml-1 p-1 rounded hover:bg-muted transition"
             onClick={e => { e.stopPropagation(); setContextMenuId(node.id === contextMenuId ? null : node.id); }}
@@ -190,7 +221,6 @@ const FileExplorer = () => {
           >
             <MoreVertical className="w-4 h-4" />
           </button>
-          {/* Context menu */}
           {contextMenuId === node.id && (
             <div className="absolute z-10 right-0 top-7 min-w-[120px] bg-[#23272e] border border-[#333] rounded shadow-lg py-1 text-xs" onMouseLeave={handleCloseContextMenu}>
               <button className="flex items-center w-full px-3 py-1 hover:bg-[#2c3e50]" onClick={() => handleRename(node.id, node.name)}>
@@ -206,7 +236,6 @@ const FileExplorer = () => {
             </div>
           )}
         </div>
-        {/* Altına yeni dosya/klasör ekleme inputu */}
         {adding.parentId === node.id && (
           <div className="flex items-center px-2 py-2 gap-1">
             {adding.type === "file" ? (
@@ -228,7 +257,6 @@ const FileExplorer = () => {
             />
           </div>
         )}
-        {/* Alt klasörler */}
         {isFolder && expanded[node.id] && node.children && (
           <div>
             {node.children.map((child: any) => renderNode(child, node.id, depth + 1))}
@@ -238,7 +266,7 @@ const FileExplorer = () => {
     );
   };
 
-  // Kökte yeni dosya/klasör ekleme
+
   return (
     <div
       ref={explorerRef}
@@ -290,7 +318,6 @@ const FileExplorer = () => {
         )}
         {tree.map((node) => renderNode(node, null, 0))}
       </div>
-      {/* Empty area context menu */}
       {emptyMenu.show && (
         <div
           className="fixed z-50 min-w-[140px] bg-zinc-900 border border-zinc-700 rounded shadow-lg py-1 text-xs"

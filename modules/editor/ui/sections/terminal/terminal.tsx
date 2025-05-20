@@ -3,112 +3,358 @@ import { useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "xterm";
 import "xterm/css/xterm.css";
 import TerminalControls from "./terminal-controls";
+import { NodeType } from "@/lib/types";
 
 const prompt = (term: XTerm, cwd: string) => {
   term.write(`\r\n${cwd} $ `);
 };
 
-const TerminalComponent = () => {
+class InputBuffer {
+  lines: string[];
+  cursorRow: number;
+  cursorCol: number;
+  constructor() {
+    this.lines = [""];
+    this.cursorRow = 0;
+    this.cursorCol = 0;
+  }
+  get value() {
+    return this.lines.join("\n");
+  }
+  insert(char: string) {
+    const line = this.lines[this.cursorRow];
+    this.lines[this.cursorRow] =
+      line.slice(0, this.cursorCol) + char + line.slice(this.cursorCol);
+    this.cursorCol++;
+  }
+  backspace() {
+    if (this.cursorCol > 0) {
+      const line = this.lines[this.cursorRow];
+      this.lines[this.cursorRow] =
+        line.slice(0, this.cursorCol - 1) + line.slice(this.cursorCol);
+      this.cursorCol--;
+    } else if (this.cursorRow > 0) {
+      const prevLine = this.lines[this.cursorRow - 1];
+      const currLine = this.lines[this.cursorRow];
+      this.cursorCol = prevLine.length;
+      this.lines[this.cursorRow - 1] = prevLine + currLine;
+      this.lines.splice(this.cursorRow, 1);
+      this.cursorRow--;
+    }
+  }
+  delete() {
+    const line = this.lines[this.cursorRow];
+    if (this.cursorCol < line.length) {
+      this.lines[this.cursorRow] =
+        line.slice(0, this.cursorCol) + line.slice(this.cursorCol + 1);
+    } else if (this.cursorRow < this.lines.length - 1) {
+      // Merge with next line
+      this.lines[this.cursorRow] += this.lines[this.cursorRow + 1];
+      this.lines.splice(this.cursorRow + 1, 1);
+    }
+  }
+  moveLeft() {
+    if (this.cursorCol > 0) {
+      this.cursorCol--;
+    } else if (this.cursorRow > 0) {
+      this.cursorRow--;
+      this.cursorCol = this.lines[this.cursorRow].length;
+    }
+  }
+  moveRight() {
+    const line = this.lines[this.cursorRow];
+    if (this.cursorCol < line.length) {
+      this.cursorCol++;
+    } else if (this.cursorRow < this.lines.length - 1) {
+      this.cursorRow++;
+      this.cursorCol = 0;
+    }
+  }
+  moveUp() {
+    if (this.cursorRow > 0) {
+      this.cursorRow--;
+      this.cursorCol = Math.min(this.cursorCol, this.lines[this.cursorRow].length);
+    }
+  }
+  moveDown() {
+    if (this.cursorRow < this.lines.length - 1) {
+      this.cursorRow++;
+      this.cursorCol = Math.min(this.cursorCol, this.lines[this.cursorRow].length);
+    }
+  }
+  moveHome() {
+    this.cursorCol = 0;
+  }
+  moveEnd() {
+    this.cursorCol = this.lines[this.cursorRow].length;
+  }
+  insertNewline() {
+    const line = this.lines[this.cursorRow];
+    const before = line.slice(0, this.cursorCol);
+    const after = line.slice(this.cursorCol);
+    this.lines[this.cursorRow] = before;
+    this.lines.splice(this.cursorRow + 1, 0, after);
+    this.cursorRow++;
+    this.cursorCol = 0;
+  }
+}
+// --- End InputBuffer ---
+
+interface TerminalComponentProps {
+  tree: NodeType[];
+  setTree: React.Dispatch<React.SetStateAction<NodeType[]>>;
+}
+
+const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
   const xtermRef = useRef<XTerm | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [cwd, setCwd] = useState("/home/user");
-  const inputBuffer = useRef("");
-  const cursorIndex = useRef(0);
+  const [cwd, setCwd] = useState("/codaive-web");
+  const inputBuffer = useRef(new InputBuffer());
   const commandHistory = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
+  const treeRef = useRef(tree);
+
+  // Track tree changes
+  useEffect(() => {
+    treeRef.current = tree;
+    console.log("Tree updated:", tree);
+  }, [tree]);
+
+  // Helper: find node by path
+  function findNodeByPath(path: string, nodes: NodeType[]): NodeType | null {
+    const parts = path.split("/").filter(Boolean);
+    let current: NodeType | null = null;
+    let children = nodes;
+    for (const part of parts) {
+      const found = children.find((n) => n.name === part);
+      if (!found) return null;
+      current = found;
+      if (found.type === "folder" && found.children) {
+        children = found.children;
+      } else {
+        children = [];
+      }
+    }
+    return current;
+  }
+
+  // Helper: get current working directory node
+  function getCwdNode(): NodeType | null {
+    if (cwd === "/" || cwd === "/codaive-web") return treeRef.current[0];
+    return findNodeByPath(cwd.replace(/^\//, ""), treeRef.current);
+  }
+
+  // Helper: update tree at path
+  function updateTreeAtPath(path: string, updater: (node: NodeType) => NodeType) {
+    const parts = path.split("/").filter(Boolean);
+    
+    if (parts.length === 0) {
+      setTree((prev) => {
+        if (prev.length === 0) return prev;
+        const newTree = [...prev];
+        newTree[0] = updater(prev[0]);
+        console.log("Updated root:", newTree);
+        return newTree;
+      });
+      return;
+    }
+    
+    setTree((prev) => {
+      // Shallow copy the array
+      const newTree = [...prev];
+      
+      function updateNodeInTree(nodes: NodeType[]): NodeType[] {
+        return nodes.map((node) => {
+          if (node.name === parts[0]) {
+            if (parts.length === 1) {
+              return updater(node);
+            } else if (node.type === "folder" && node.children) {
+              const newParts = parts.slice(1);
+              return {
+                ...node,
+                children: updateNodeWithParts(node.children, newParts)
+              };
+            }
+          }
+          return node;
+        });
+      }
+      
+      function updateNodeWithParts(nodes: NodeType[], remainingParts: string[]): NodeType[] {
+        return nodes.map((node) => {
+          if (node.name === remainingParts[0]) {
+            if (remainingParts.length === 1) {
+              return updater(node);
+            } else if (node.type === "folder" && node.children) {
+              return {
+                ...node,
+                children: updateNodeWithParts(node.children, remainingParts.slice(1))
+              };
+            }
+          }
+          return node;
+        });
+      }
+      
+      const result = updateNodeInTree(newTree);
+      console.log("Updated tree with path:", path, result);
+      return result;
+    });
+  }
+
+  // Helper: get path from cwd + name
+  function getPath(name: string) {
+    return (cwd === "/" ? "" : cwd) + "/" + name;
+  }
 
   useEffect(() => {
     if (!containerRef.current) return;
+    const fontSize = 14;
+    const lineHeight = 1.2;
+    const rowHeight = fontSize * lineHeight;
+    const rows = Math.floor((window.innerHeight * 0.38) / rowHeight);
     const term = new XTerm({
-      fontSize: 14,
+      fontSize,
       theme: { background: "#18181b", foreground: "#e4e4e7" },
       cursorBlink: true,
       fontFamily: 'Menlo, Monaco, "Liberation Mono", "Courier New", monospace',
-      rows: 20
+      rows,
     });
     term.open(containerRef.current);
-    term.writeln("Welcome to AI Terminal!");
+    term.writeln("Welcome to Codaive Terminal");
     prompt(term, cwd);
 
+    term.attachCustomKeyEventHandler((e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") return true;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && term.hasSelection()) return true;
+      return true;
+    });
+
+    const handlePaste = (event: ClipboardEvent) => {
+      if (!xtermRef.current) return;
+      const text = event.clipboardData?.getData("text");
+      if (text) {
+        for (const char of text) {
+          inputBuffer.current.insert(char);
+        }
+        redrawInput();
+        event.preventDefault();
+      }
+    };
+
+    containerRef.current.addEventListener("paste", handlePaste);
+
     const redrawInput = () => {
-      // Satırı temizle ve input buffer'ı tekrar yaz
-      term.write(`\r${cwd} $ ${inputBuffer.current}`);
-      // İmleci doğru yere getir
-      const pos = inputBuffer.current.length - cursorIndex.current;
-      if (pos > 0) term.write(`\x1b[${pos}D`);
+      term.write("\r\x1b[K");
+      term.write(`${cwd} $ `);
+      inputBuffer.current.lines.forEach((line, i) => {
+        if (i > 0) term.write("\n");
+        term.write(line);
+      });
+      const totalLines = inputBuffer.current.lines.length;
+      const row = inputBuffer.current.cursorRow;
+      const col = inputBuffer.current.cursorCol;
+      if (totalLines - row - 1 > 0) term.write(`\x1b[${totalLines - row - 1}A`);
+      term.write(`\r${cwd} $ ` + inputBuffer.current.lines[row].slice(0, col));
     };
 
     term.onKey(({ key, domEvent }: { key: string; domEvent: KeyboardEvent }) => {
-      if (domEvent.key === "Enter") {
-        term.write("\r\n");
-        const command = inputBuffer.current;
-        commandHistory.current.push(command);
-        historyIndex.current = -1;
-        handleCommand(term, command);
-        inputBuffer.current = "";
-        cursorIndex.current = 0;
-        prompt(term, cwd);
-      } else if (domEvent.key === "Backspace") {
-        if (cursorIndex.current < inputBuffer.current.length) {
-          // İmleç ortadaysa
-          inputBuffer.current =
-            inputBuffer.current.slice(0, inputBuffer.current.length - cursorIndex.current - 1) +
-            inputBuffer.current.slice(inputBuffer.current.length - cursorIndex.current);
-          redrawInput();
-        } else if (inputBuffer.current.length > 0) {
-          // Sonda ise
-          inputBuffer.current = inputBuffer.current.slice(0, -1);
-          term.write("\b \b");
-        }
+      if (domEvent.ctrlKey && domEvent.key === "a") {
+        inputBuffer.current.moveHome();
+        redrawInput();
+      } else if (domEvent.ctrlKey && domEvent.key === "e") {
+        inputBuffer.current.moveEnd();
+        redrawInput();
       } else if (domEvent.key === "ArrowLeft") {
-        if (cursorIndex.current < inputBuffer.current.length) {
-          cursorIndex.current++;
-          term.write("\x1b[D");
-        }
+        inputBuffer.current.moveLeft();
+        redrawInput();
       } else if (domEvent.key === "ArrowRight") {
-        if (cursorIndex.current > 0) {
-          cursorIndex.current--;
-          term.write("\x1b[C");
-        }
+        inputBuffer.current.moveRight();
+        redrawInput();
       } else if (domEvent.key === "ArrowUp") {
-        if (commandHistory.current.length > 0) {
-          if (historyIndex.current < commandHistory.current.length - 1) {
-            historyIndex.current++;
-            inputBuffer.current = commandHistory.current[commandHistory.current.length - 1 - historyIndex.current];
-            cursorIndex.current = 0;
-            redrawInput();
+        inputBuffer.current.moveUp();
+        redrawInput();
+      } else if (domEvent.key === "ArrowDown") {
+        inputBuffer.current.moveDown();
+        redrawInput();
+      } else if (domEvent.key === "Home") {
+        inputBuffer.current.moveHome();
+        redrawInput();
+      } else if (domEvent.key === "End") {
+        inputBuffer.current.moveEnd();
+        redrawInput();
+      } else if (domEvent.key === "Backspace") {
+        inputBuffer.current.backspace();
+        redrawInput();
+      } else if (domEvent.key === "Delete") {
+        inputBuffer.current.delete();
+        redrawInput();
+      } else if (domEvent.key === "Tab") {
+        const currentInput = inputBuffer.current.value;
+        const parts = currentInput.split(" ");
+        
+        if (parts[0] === "cd" && parts.length === 2 && parts[1].length > 0) {
+          const prefix = parts[1];
+          const cwdNode = getCwdNode();
+          
+          if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
+            const matches = cwdNode.children
+              .filter(n => n.type === "folder" && n.name.startsWith(prefix))
+              .map(n => n.name);
+            
+            if (matches.length === 1) {
+              const newInput = `cd ${matches[0]}`;
+              inputBuffer.current = new InputBuffer();
+              for (const char of newInput) {
+                inputBuffer.current.insert(char);
+              }
+              redrawInput();
+            } 
+            else if (matches.length > 1) {
+              let commonPrefix = matches[0];
+              for (let i = 1; i < matches.length; i++) {
+                commonPrefix = findCommonPrefix(commonPrefix, matches[i]);
+              }
+              
+              if (commonPrefix.length > prefix.length) {
+                const newInput = `cd ${commonPrefix}`;
+                inputBuffer.current = new InputBuffer();
+                for (const char of newInput) {
+                  inputBuffer.current.insert(char);
+                }
+                redrawInput();
+              } else {
+                term.writeln("\r\n" + matches.join("  "));
+                prompt(term, cwd);
+                redrawInput();
+              }
+            }
           }
         }
-      } else if (domEvent.key === "ArrowDown") {
-        if (historyIndex.current > 0) {
-          historyIndex.current--;
-          inputBuffer.current = commandHistory.current[commandHistory.current.length - 1 - historyIndex.current];
-          cursorIndex.current = 0;
+        domEvent.preventDefault();
+      } else if (domEvent.key === "Enter") {
+        if (domEvent.shiftKey) {
+          inputBuffer.current.insertNewline();
           redrawInput();
-        } else if (historyIndex.current === 0) {
+        } else {
+          const command = inputBuffer.current.value;
+          commandHistory.current.push(command);
           historyIndex.current = -1;
-          inputBuffer.current = "";
-          cursorIndex.current = 0;
-          redrawInput();
+          term.write("\r\n");
+          handleCommand(term, command);
+          inputBuffer.current = new InputBuffer();
+          prompt(term, cwd);
         }
       } else if (domEvent.key.length === 1 && !domEvent.ctrlKey && !domEvent.metaKey) {
-        // Karakter ekle
-        if (cursorIndex.current === 0) {
-          inputBuffer.current += key;
-          term.write(key);
-        } else {
-          // Ortada karakter ekle
-          const pos = inputBuffer.current.length - cursorIndex.current;
-          inputBuffer.current =
-            inputBuffer.current.slice(0, pos) + key + inputBuffer.current.slice(pos);
-          redrawInput();
-        }
+        inputBuffer.current.insert(key);
+        redrawInput();
       }
     });
 
     xtermRef.current = term;
     return () => {
       term.dispose();
+      containerRef.current?.removeEventListener("paste", handlePaste);
     };
   }, [cwd]);
 
@@ -118,12 +364,11 @@ const TerminalComponent = () => {
     const handleResize = () => {
       const container = containerRef.current!;
       const term = xtermRef.current!;
-      // Her satırın px yüksekliği: fontSize * lineHeight (yaklaşık 1.2)
       const fontSize = 14;
       const lineHeight = 1.2;
       const rowHeight = fontSize * lineHeight;
       const rows = Math.floor(container.offsetHeight / rowHeight);
-      const cols = Math.floor(container.offsetWidth / 8); // 8px: monospace char width approx
+      const cols = Math.floor(container.offsetWidth / 8);
       if (rows > 0 && cols > 0) {
         term.resize(cols, rows);
       }
@@ -134,30 +379,116 @@ const TerminalComponent = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Komutları simüle et
   const handleCommand = (term: XTerm, command: string) => {
-    const [cmd, ...args] = command.trim().split(" ");
+    const [cmd, ...args] = command.trim().split(/\s+/);
+    const cwdNode = getCwdNode();
     switch (cmd) {
-      case "ls":
-        term.writeln("file1.txt  file2.js  folder/");
+      case "ls": {
+        if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
+          console.log(cwdNode.children);
+          term.writeln(cwdNode.children.map((n) => n.name + (n.type === "folder" ? "/" : "")).join("  ") || "");
+        } else {
+          term.writeln("Not a directory");
+        }
         break;
-      case "cd":
-        if (args[0]) setCwd(args[0]);
+      }
+      case "cd": {
+        const target = args[0] || "/";
+      
+        if (target === "..") {
+          if (cwd === "/" || cwd === "/codaive-web") {
+            term.writeln("Already at root directory");
+          } else {
+            const parentPath = cwd.split("/").slice(0, -1).join("/") || "/";
+            setCwd(parentPath);
+          }
+          break;
+        }
+        
+        let newPath = target;
+        if (!target.startsWith("/")) {
+          newPath = (cwd === "/" ? "" : cwd) + "/" + target;
+        }
+        const node = findNodeByPath(newPath.replace(/^\//, ""), treeRef.current);
+        if (node && node.type === "folder") {
+          setCwd("/" + newPath.replace(/^\//, ""));
+        } else {
+          term.writeln("No such directory: " + target);
+        }
         break;
-      case "clear":
+      }
+      case "mkdir": {
+        const name = args[0];
+        if (!name) return term.writeln("Usage: mkdir <folder>");
+        if (!cwdNode || cwdNode.type !== "folder") return term.writeln("Not a directory");
+        if (cwdNode.children?.some((n) => n.name === name)) return term.writeln("File or folder exists");
+        updateTreeAtPath(cwd.replace(/^\//, ""), (node) => {
+          if (node.type !== "folder") return node;
+          return {
+            ...node,
+            children: [...(node.children || []), { id: Math.random().toString(36), name, type: "folder", children: [] }],
+          };
+        });
+        setTimeout(() => prompt(term, cwd), 0);
+        break;
+      }
+      case "touch": {
+        const name = args[0];
+        if (!name) return term.writeln("Usage: touch <file>");
+        if (!cwdNode || cwdNode.type !== "folder") return term.writeln("Not a directory");
+        if (cwdNode.children?.some((n) => n.name === name)) return term.writeln("File or folder exists");
+        updateTreeAtPath(cwd.replace(/^\//, ""), (node) => {
+          if (node.type !== "folder") return node;
+          return {
+            ...node,
+            children: [...(node.children || []), { id: Math.random().toString(36), name, type: "file" }],
+          };
+        });
+        setTimeout(() => prompt(term, cwd), 0);
+        break;
+      }
+      case "rm": {
+        const name = args[0];
+        if (!name) return term.writeln("Usage: rm <file|folder>");
+        updateTreeAtPath(cwd.replace(/^\//, ""), (node) => {
+          if (node.type !== "folder") return node;
+          return {
+            ...node,
+            children: (node.children || []).filter((n) => n.name !== name),
+          };
+        });
+        setTimeout(() => prompt(term, cwd), 0);
+        break;
+      }
+      case "cat": {
+        const name = args[0];
+        if (!name) return term.writeln("Usage: cat <file>");
+        let file = null;
+        if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
+          file = cwdNode.children.find((n) => n.name === name && n.type === "file");
+        }
+        if (file) {
+          term.writeln(`(empty)`); // You can extend this to support file content
+        } else {
+          term.writeln("No such file: " + name);
+        }
+        break;
+      }
+      case "echo": {
+        term.writeln(args.join(" "));
+        break;
+      }
+      case "clear": {
         term.clear();
         break;
-      case "echo":
-        term.writeln(args.join(" "));
+      }
+      case "help": {
+        term.writeln("Available commands: ls, cd, mkdir, touch, rm, cat, echo, clear, help");
         break;
-      case "console.log":
-        term.writeln(args.join(" "));
-        break;
-      case "help":
-        term.writeln("ls, cd <dir>, clear, echo <msg>, console.log <msg>, help");
-        break;
-      default:
+      }
+      default: {
         if (cmd) term.writeln(`Command not found: ${cmd}`);
+      }
     }
   };
 
@@ -167,7 +498,7 @@ const TerminalComponent = () => {
   };
   const handleCopy = () => {
     if (!xtermRef.current) return;
-    // Get all lines from the active buffer
+
     const buffer = xtermRef.current.buffer.active;
     let text = "";
     for (let i = 0; i < buffer.length; i++) {
@@ -183,7 +514,6 @@ const TerminalComponent = () => {
   };
   const handleTheme = () => {
     if (!xtermRef.current) return;
-    // xterm.js public API'de theme'ı doğrudan değiştirmek için setOption yok, options property'sini güncelle:
     const currentBg = xtermRef.current.options.theme?.background;
     const isDark = currentBg === "#18181b";
     xtermRef.current.options.theme = isDark
@@ -191,6 +521,14 @@ const TerminalComponent = () => {
       : { background: "#18181b", foreground: "#e4e4e7" };
     xtermRef.current.refresh(0, xtermRef.current.rows - 1);
   };
+
+  function findCommonPrefix(a: string, b: string): string {
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) {
+      i++;
+    }
+    return a.substring(0, i);
+  }
 
   return (
     <div className="flex flex-col bg-background border-t min-h-0">

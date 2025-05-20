@@ -3,7 +3,7 @@ import { Editor } from "@monaco-editor/react";
 import EditorLoading from "../components/editor-loading";
 
 const CodeEditor = () => {
-    return <div className="h-full w-full">
+    return <div className="h-[60%] w-full">
         <Editor
             options={{
                 minimap: {
