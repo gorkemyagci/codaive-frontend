@@ -5,6 +5,25 @@ import "xterm/css/xterm.css";
 import TerminalControls from "./terminal-controls";
 import { NodeType } from "@/lib/types";
 
+// Add custom scrollbar style
+const scrollbarStyle = `
+  .xterm .xterm-viewport::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+    background: #3f3f46;
+    border-radius: 5px;
+  }
+  .xterm .xterm-viewport::-webkit-scrollbar-track {
+    background: #27272a;
+  }
+  .xterm .xterm-viewport {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 #27272a;
+  }
+`;
+
 const prompt = (term: XTerm, cwd: string) => {
   term.write(`\r\n${cwd} $ `);
 };
@@ -197,6 +216,12 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
 
   useEffect(() => {
     if (!containerRef.current) return;
+    
+    // Add custom scrollbar styles
+    const styleElement = document.createElement('style');
+    styleElement.textContent = scrollbarStyle;
+    document.head.appendChild(styleElement);
+    
     const fontSize = 14;
     const lineHeight = 1.2;
     const rowHeight = fontSize * lineHeight;
@@ -351,6 +376,8 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
       if (terminalRef) {
         terminalRef.current = null;
       }
+      // Remove the style element when component unmounts
+      styleElement.remove();
     };
   }, [cwd, terminalRef]);
 
