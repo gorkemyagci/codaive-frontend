@@ -1,9 +1,9 @@
 "use client";
-import { Editor } from "@monaco-editor/react";
 import EditorLoading from "../components/editor-loading";
 import { NodeType } from "@/lib/types";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Terminal as XTerm } from "xterm";
+import { Editor } from "@monaco-editor/react";
 
 interface CodeEditorProps {
     selectedFile: NodeType | null;
@@ -29,13 +29,30 @@ interface ExecuteCodeResponse {
     };
 }
 
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number) {
+    let timer: any;
+    return (...args: Parameters<T>) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+
 const CodeEditor = ({ selectedFile, terminalRef }: CodeEditorProps) => {
     const [code, setCode] = useState("");
+    const [ghostText, setGhostText] = useState("");
+    const [ghostRange, setGhostRange] = useState<any>(null);
+    const [isFetchingGhost, setIsFetchingGhost] = useState(false);
     const editorRef = useRef<any>(null);
-    
+    const monacoRef = useRef<any>(null);
+    const lastGhostRequest = useRef<string>("");
+    const lastCursorLine = useRef<number>(1);
+    const [ghostLineNumber, setGhostLineNumber] = useState<number | null>(null);
+    // Add a reference to store the actual ghost text
+    const currentGhostText = useRef<string>("");
+
     const getLanguage = (filename: string) => {
         const extension = filename.split('.').pop()?.toLowerCase();
-        
+
         switch (extension) {
             case 'js':
                 return 'javascript';
@@ -77,7 +94,7 @@ const CodeEditor = ({ selectedFile, terminalRef }: CodeEditorProps) => {
                 return 'plaintext';
         }
     };
-    
+
     const getPistonLanguage = (extension: string) => {
         switch (extension) {
             case 'js':
@@ -111,12 +128,12 @@ const CodeEditor = ({ selectedFile, terminalRef }: CodeEditorProps) => {
 
     const executeCode = async () => {
         if (!selectedFile || !code.trim() || !terminalRef?.current) return;
-        
+
         const extension = selectedFile.name.split('.').pop()?.toLowerCase() || '';
         const { language, version } = getPistonLanguage(extension);
-        
+
         terminalRef.current.writeln(`\r\n[Executing ${selectedFile.name}...]\r\n`);
-        
+
         try {
             const response = await fetch('https://emkc.org/api/v2/piston/execute', {
                 method: 'POST',
@@ -138,27 +155,27 @@ const CodeEditor = ({ selectedFile, terminalRef }: CodeEditorProps) => {
                     run_timeout: 3000,
                 }),
             });
-            
+
             const data: ExecuteCodeResponse = await response.json();
-            
+
             // Handle compilation errors if any
             if (data.compile && (data.compile.stderr || data.compile.code !== 0)) {
                 terminalRef.current.writeln(`\x1b[31m[Compilation Error]\x1b[0m`);
                 terminalRef.current.writeln(data.compile.stderr || 'Unknown compilation error');
                 return;
             }
-            
+
             // Handle execution errors
             if (data.run.stderr) {
                 terminalRef.current.writeln(`\x1b[31m[Error]\x1b[0m`);
                 terminalRef.current.writeln(data.run.stderr);
             }
-            
+
             // Show output
             if (data.run.stdout) {
                 terminalRef.current.writeln(data.run.stdout);
             }
-            
+
             // Show exit code if non-zero
             if (data.run.code !== 0) {
                 terminalRef.current.writeln(`\x1b[31m[Process exited with code: ${data.run.code}]\x1b[0m`);
@@ -169,24 +186,77 @@ const CodeEditor = ({ selectedFile, terminalRef }: CodeEditorProps) => {
             terminalRef.current.writeln(`\x1b[31m[Error] Failed to execute code: ${error instanceof Error ? error.message : String(error)}\x1b[0m`);
         }
     };
-    
-    const handleEditorDidMount = (editor: any) => {
+
+    const handleEditorDidMount = (editor: any, monacoInstance: any) => {
         editorRef.current = editor;
-        editor.addCommand(
-            // Monaco.KeyMod.CtrlCmd | Monaco.KeyCode.KeyS (would be the correct way, but need to import Monaco)
-            // Using keyCodes: Cmd/Ctrl(2048) + S(83)
-            2048 | 83,
-            () => {
-                setCode(editor.getValue());
-                executeCode();
+        monacoRef.current = monacoInstance;
+
+        // Ctrl+S to execute code
+        editor.addCommand(2048 | 83, () => {
+            setCode(editor.getValue());
+            executeCode();
+        });
+
+        // Override Tab key behavior
+        editor.addCommand(monacoInstance.KeyCode.Tab, () => {
+            console.log("Tab pressed! Ghost text:", currentGhostText.current);
+            const position = editor.getPosition();
+            
+            // Check if we have ghost text to insert
+            if (
+                currentGhostText.current && 
+                currentGhostText.current.trim() && 
+                position && 
+                ghostLineNumber !== null &&
+                position.lineNumber === ghostLineNumber
+            ) {
+                // Insert the ghost text at the current position
+                const model = editor.getModel();
+                if (model) {
+                    try {
+                        // Create a range starting from the current position (where to insert text)
+                        const range = new monacoInstance.Range(
+                            position.lineNumber,
+                            position.column,
+                            position.lineNumber,
+                            position.column
+                        );
+                        
+                        // Execute the edit operation to insert the ghost text
+                        editor.executeEdits("ghost-text", [{
+                            range: range,
+                            text: currentGhostText.current,
+                            forceMoveMarkers: true
+                        }]);
+                        
+                        // Update code state and clear ghost text
+                        setCode(editor.getValue());
+                        setGhostText("");
+                        currentGhostText.current = "";
+                        setGhostRange(null);
+                        setGhostLineNumber(null);
+                        return;
+                    } catch (error) {
+                        console.error("Error during Tab operation:", error);
+                    }
+                }
+            } else {
+                // If no ghost text, insert a regular tab character
+                editor.trigger('keyboard', 'type', { text: '\t' });
             }
-        );
+        });
     };
-    
+
     const handleEditorChange = (value: string = "") => {
         setCode(value);
+        if (editorRef.current) {
+            const position = editorRef.current.getPosition();
+            if (position) {
+                debounceFetch(value, position.lineNumber);
+            }
+        }
     };
-    
+
     useEffect(() => {
         if (selectedFile) {
             setCode("");
@@ -205,13 +275,183 @@ const CodeEditor = ({ selectedFile, terminalRef }: CodeEditorProps) => {
                 }
             }
         };
-        
+
         window.addEventListener('keydown', handleKeyDown);
 
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [selectedFile, executeCode]);
+    }, [selectedFile]);
+
+    // Update ghost text and its valid line
+    const fetchGhostTextForLine = useCallback(async (codeContext: string, line: number) => {
+        setIsFetchingGhost(true);
+        try {
+            // Only get ghost text for the current line
+            const lines = codeContext.split("\n");
+            const before = lines.slice(0, line).join("\n");
+            const prompt = `Aşağıdaki kodun ${line}. satırını tamamla, sadece devamını döndür:\n\n${before}`;
+            console.log("Fetching ghost text for line", line, "with code:", before);
+            
+            const response = await fetch("/api/openrouter-prox", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    model: "deepseek/deepseek-prover-v2:free",
+                    messages: [
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0.2
+                })
+            });
+            
+            const data = await response.json();
+            let suggestion = data.choices?.[0]?.message?.content;
+            if (typeof suggestion !== 'string') suggestion = '';
+            
+            try {
+                suggestion = suggestion.replace(/```[a-zA-Z]*\n?/, '').replace(/```/, '').trim();
+            } catch { suggestion = ''; }
+            
+            try {
+                suggestion = suggestion.split('\n')[0] || '';
+            } catch { suggestion = ''; }
+            
+            console.log("Ghost text suggestion:", suggestion);
+            
+            if (!suggestion || typeof suggestion !== 'string' || !suggestion.trim()) {
+                setGhostText('');
+                currentGhostText.current = '';
+                setGhostLineNumber(null);
+                return;
+            }
+            
+            // Set the ghost text state and ref
+            setGhostText(suggestion);
+            currentGhostText.current = suggestion;
+            
+            // Set the line for which this ghost text is valid
+            setTimeout(() => {
+                if (editorRef.current) {
+                    const pos = editorRef.current.getPosition();
+                    if (pos) setGhostLineNumber(pos.lineNumber);
+                }
+            }, 0);
+        } catch (e) {
+            console.error("Error fetching ghost text:", e);
+        } finally {
+            setIsFetchingGhost(false);
+        }
+    }, []);
+
+    // Debug: log when ghost text is set
+    useEffect(() => {
+        if (ghostText) {
+            console.log("Ghost text set:", ghostText, ghostLineNumber);
+            // Update the ref value when the state changes
+            currentGhostText.current = ghostText;
+        }
+    }, [ghostText, ghostLineNumber]);
+
+    // Clear ghost text if cursor moves away from the valid line
+    useEffect(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+        
+        const onDidChangeCursorPosition = editor.onDidChangeCursorPosition((e: any) => {
+            if (ghostLineNumber == null) return;
+            const pos = e.position;
+            if (pos.lineNumber !== ghostLineNumber) {
+                setGhostText("");
+                currentGhostText.current = "";
+                setGhostRange(null);
+                setGhostLineNumber(null);
+            }
+        });
+        
+        return () => {
+            onDidChangeCursorPosition.dispose();
+        };
+    }, [ghostLineNumber]);
+
+    // Debounced fetch (must be after fetchGhostTextForLine)
+    const debounceFetch = useCallback(
+        debounce((code: string, line: number) => {
+            fetchGhostTextForLine(code, line);
+        }, 500),
+        [fetchGhostTextForLine]
+    );
+
+    // Add ghost text as inline decoration
+    useEffect(() => {
+        if (!editorRef.current) return;
+        const editor = editorRef.current;
+        const monaco = monacoRef.current;
+        
+        // Remove previous decoration
+        if (ghostRange && ghostRange.decorationId) {
+            editor.deltaDecorations([ghostRange.decorationId], []);
+        }
+        
+        if (!ghostText || !monaco) {
+            setGhostRange(null);
+            return;
+        }
+        
+        const position = editor.getPosition();
+        if (!position) return;
+        
+        const model = editor.getModel();
+        if (!model) return;
+        
+        const lineNumber = position.lineNumber;
+        const column = position.column;
+        
+        let lineContent = '';
+        try {
+            lineContent = model.getLineContent(lineNumber) || '';
+        } catch { lineContent = ''; }
+        
+        if (typeof lineContent !== 'string') return;
+        if (column < 1 || column > lineContent.length + 1) return;
+        
+        if (!ghostText.trim()) {
+            setGhostRange(null);
+            return;
+        }
+        
+        let decoration;
+        try {
+            decoration = {
+                range: new monaco.Range(lineNumber, column, lineNumber, column),
+                options: {
+                    after: {
+                        content: ghostText,
+                        inlineClassName: "ghost-text-inline"
+                    }
+                }
+            };
+        } catch { return; }
+        
+        let decorationIds = [];
+        try {
+            decorationIds = editor.deltaDecorations([], [decoration]);
+        } catch { return; }
+        
+        if (!decorationIds || !decorationIds[0]) return;
+        setGhostRange({ decorationId: decorationIds[0], lineNumber, column });
+    }, [ghostText]);
+
+    // Add ghost text style
+    useEffect(() => {
+        const styleId = "ghost-text-inline-style";
+        if (!document.getElementById(styleId)) {
+            const style = document.createElement("style");
+            style.id = styleId;
+            style.innerHTML = `.ghost-text-inline { opacity: 0.5; font-style: italic; color: #aaa !important; }`;
+            document.head.appendChild(style);
+        }
+    }, []);
 
     return (
         <div className="h-[60%] w-full">
@@ -223,6 +463,16 @@ const CodeEditor = ({ selectedFile, terminalRef }: CodeEditorProps) => {
                         },
                         scrollBeyondLastLine: false,
                         automaticLayout: true,
+                        tabCompletion: 'off',
+                        useTabStops: false,
+                        quickSuggestions: false,
+                        suggestOnTriggerCharacters: false,
+                        acceptSuggestionOnEnter: 'off',
+                        snippetSuggestions: 'none',
+                        autoIndent: 'none',
+                        insertSpaces: false,
+                        detectIndentation: false,
+                        tabFocusMode: false,
                     }}
                     height="100%"
                     width="100%"
