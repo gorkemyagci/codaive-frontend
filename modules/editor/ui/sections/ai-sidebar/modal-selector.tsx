@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 
-// Only Deepseek model is available
 const models = ["Deepseek"];
 
 const ModalSelector = () => {

@@ -133,7 +133,6 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
 
   useEffect(() => {
     treeRef.current = tree;
-    console.log(tree);
   }, [tree]);
 
   function getCwdNode(): NodeType | null {
