@@ -18,9 +18,11 @@ function getFileIcon(name: string) {
 interface FileExplorerProps {
   tree: NodeType[];
   setTree: React.Dispatch<React.SetStateAction<NodeType[]>>;
+  selectedFile: NodeType | null;
+  setSelectedFile: React.Dispatch<React.SetStateAction<NodeType | null>>;
 }
 
-const FileExplorer = ({ tree, setTree }: FileExplorerProps) => {
+const FileExplorer = ({ tree, setTree, selectedFile, setSelectedFile }: FileExplorerProps) => {
   const [expanded, setExpanded] = useState<{ [key: string]: boolean }>({});
   const [adding, setAdding] = useState<{ parentId: string | null; type: "file" | "folder" | null }>({ parentId: null, type: null });
   const [newName, setNewName] = useState("");
@@ -114,6 +116,26 @@ const FileExplorer = ({ tree, setTree }: FileExplorerProps) => {
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
+    
+    const findNode = (nodes: NodeType[]): NodeType | null => {
+      for (const node of nodes) {
+        if (node.id === id) {
+          return node;
+        }
+        if (node.type === "folder" && node.children) {
+          const found = findNode(node.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const node = findNode(tree);
+    
+    if (node && node.type === "file") {
+      setSelectedFile(node);
+    } else {
+    }
   };
 
   const handleRename = (id: string, name: string) => {

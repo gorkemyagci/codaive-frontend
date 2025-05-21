@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { Forward, Paperclip } from "lucide-react";
+import { Message } from "./chat-box";
 
 const commands = ["/analyze", "/commit", "/test"];
 
@@ -15,7 +16,12 @@ function getCurrentWord(value: string, selectionStart: number) {
   return { word, wordStart, wordEnd };
 }
 
-const CommandInput = () => {
+interface CommandInputProps {
+  onSendMessage: (message: string) => void;
+  isLoading: boolean;
+}
+
+const CommandInput = ({ onSendMessage, isLoading }: CommandInputProps) => {
   const [value, setValue] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selected, setSelected] = useState(0);
@@ -74,6 +80,13 @@ const CommandInput = () => {
     }
     if (e.key === "Enter" && !e.shiftKey && !showSuggestions) {
       e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (value.trim() && !isLoading) {
+      onSendMessage(value);
       setValue("");
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
@@ -135,14 +148,21 @@ const CommandInput = () => {
             autoComplete="off"
             spellCheck={false}
             style={{ zIndex: 2, background: "transparent", overflow: "hidden" }}
+            disabled={isLoading}
           />
           {getGhostTextSpan()}
         </div>
         <button
           type="button"
-          className="ml-2 p-2 rounded-full text-white flex items-center justify-center shadow transition"
+          className={`ml-2 p-2 rounded-full flex items-center justify-center shadow transition ${
+            isLoading 
+              ? "bg-gray-600 cursor-not-allowed text-gray-300" 
+              : "bg-blue-600 hover:bg-blue-700 text-white"
+          }`}
+          onClick={handleSendMessage}
           tabIndex={0}
           aria-label="Send"
+          disabled={isLoading}
         >
           <Forward className="size-4" />
         </button>

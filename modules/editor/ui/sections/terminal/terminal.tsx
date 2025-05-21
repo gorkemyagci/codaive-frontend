@@ -103,9 +103,10 @@ class InputBuffer {
 interface TerminalComponentProps {
   tree: NodeType[];
   setTree: React.Dispatch<React.SetStateAction<NodeType[]>>;
+  terminalRef?: React.MutableRefObject<XTerm | null>;
 }
 
-const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
+const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProps) => {
   const xtermRef = useRef<XTerm | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [cwd, setCwd] = useState("/codaive-web");
@@ -114,13 +115,10 @@ const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
   const historyIndex = useRef<number>(-1);
   const treeRef = useRef(tree);
 
-  // Track tree changes
   useEffect(() => {
     treeRef.current = tree;
-    console.log("Tree updated:", tree);
   }, [tree]);
 
-  // Helper: find node by path
   function findNodeByPath(path: string, nodes: NodeType[]): NodeType | null {
     const parts = path.split("/").filter(Boolean);
     let current: NodeType | null = null;
@@ -138,13 +136,11 @@ const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
     return current;
   }
 
-  // Helper: get current working directory node
   function getCwdNode(): NodeType | null {
     if (cwd === "/" || cwd === "/codaive-web") return treeRef.current[0];
     return findNodeByPath(cwd.replace(/^\//, ""), treeRef.current);
   }
 
-  // Helper: update tree at path
   function updateTreeAtPath(path: string, updater: (node: NodeType) => NodeType) {
     const parts = path.split("/").filter(Boolean);
     
@@ -153,14 +149,12 @@ const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
         if (prev.length === 0) return prev;
         const newTree = [...prev];
         newTree[0] = updater(prev[0]);
-        console.log("Updated root:", newTree);
         return newTree;
       });
       return;
     }
     
     setTree((prev) => {
-      // Shallow copy the array
       const newTree = [...prev];
       
       function updateNodeInTree(nodes: NodeType[]): NodeType[] {
@@ -197,14 +191,8 @@ const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
       }
       
       const result = updateNodeInTree(newTree);
-      console.log("Updated tree with path:", path, result);
       return result;
     });
-  }
-
-  // Helper: get path from cwd + name
-  function getPath(name: string) {
-    return (cwd === "/" ? "" : cwd) + "/" + name;
   }
 
   useEffect(() => {
@@ -352,11 +340,19 @@ const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
     });
 
     xtermRef.current = term;
+    // Update the external ref if provided
+    if (terminalRef) {
+      terminalRef.current = term;
+    }
+
     return () => {
       term.dispose();
       containerRef.current?.removeEventListener("paste", handlePaste);
+      if (terminalRef) {
+        terminalRef.current = null;
+      }
     };
-  }, [cwd]);
+  }, [cwd, terminalRef]);
 
   useEffect(() => {
     if (!containerRef.current || !xtermRef.current) return;
@@ -385,7 +381,6 @@ const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
     switch (cmd) {
       case "ls": {
         if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
-          console.log(cwdNode.children);
           term.writeln(cwdNode.children.map((n) => n.name + (n.type === "folder" ? "/" : "")).join("  ") || "");
         } else {
           term.writeln("Not a directory");
@@ -468,7 +463,7 @@ const TerminalComponent = ({ tree, setTree }: TerminalComponentProps) => {
           file = cwdNode.children.find((n) => n.name === name && n.type === "file");
         }
         if (file) {
-          term.writeln(`(empty)`); // You can extend this to support file content
+          term.writeln(`(empty)`); 
         } else {
           term.writeln("No such file: " + name);
         }

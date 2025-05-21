@@ -1,8 +1,12 @@
 "use client";
 import { useState } from "react";
-const models = ["GPT-4", "Claude", "Ollama"];
+
+// Only Deepseek model is available
+const models = ["Deepseek"];
+
 const ModalSelector = () => {
-  const [selected, setSelected] = useState("GPT-4");
+  const [selected, setSelected] = useState("Deepseek");
+  
   return (
     <div className="px-4 pt-4 pb-2 bg-zinc-900/80 border-b border-zinc-800 shadow-sm">
       <div className="font-semibold text-xs text-muted-foreground mb-2 tracking-wide">Model</div>
@@ -24,4 +28,5 @@ const ModalSelector = () => {
     </div>
   );
 };
+
 export default ModalSelector;
