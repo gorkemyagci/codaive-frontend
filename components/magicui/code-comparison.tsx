@@ -75,7 +75,6 @@ export function CodeComparison({
         setHighlightedBefore(before);
         setHighlightedAfter(after);
       } catch (error) {
-        console.error("Error highlighting code:", error);
         setHighlightedBefore(`<pre>${beforeCode}</pre>`);
         setHighlightedAfter(`<pre>${afterCode}</pre>`);
       }

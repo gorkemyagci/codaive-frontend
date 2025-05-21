@@ -61,13 +61,11 @@ const EditorView = () => {
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    console.error('API response error:', response.status, errorText);
                     throw new Error(`API error: ${response.status}`);
                 }
 
                 responseData = await response.json();
             } catch (fetchError) {
-                console.error('Fetch error:', fetchError);
                 throw new Error('Failed to connect to AI service');
             }
 
@@ -75,7 +73,6 @@ const EditorView = () => {
             const aiMessage: Message = { role: 'ai', content: aiResponse };
             setMessages(prev => [...prev, aiMessage]);
         } catch (error) {
-            console.error('Error calling AI API:', error);
             const errorMessage: Message = {
                 role: 'ai',
                 content: `Sorry, there was an error: ${error instanceof Error ? error.message : 'Unknown error'}`

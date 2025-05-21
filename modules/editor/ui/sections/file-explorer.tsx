@@ -33,10 +33,6 @@ const FileExplorer = ({ tree, setTree, selectedFile, setSelectedFile }: FileExpl
   const [emptyMenu, setEmptyMenu] = useState<{ x: number; y: number; show: boolean }>({ x: 0, y: 0, show: false });
   const explorerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    console.log(tree);
-  }, [tree]);
-
   const toggle = (id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };

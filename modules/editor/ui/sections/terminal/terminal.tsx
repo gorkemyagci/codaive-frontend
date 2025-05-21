@@ -5,7 +5,6 @@ import "xterm/css/xterm.css";
 import TerminalControls from "./terminal-controls";
 import { NodeType } from "@/lib/types";
 
-// Add custom scrollbar style
 const scrollbarStyle = `
   .xterm .xterm-viewport::-webkit-scrollbar {
     width: 10px;
@@ -117,7 +116,6 @@ class InputBuffer {
     this.cursorCol = 0;
   }
 }
-// --- End InputBuffer ---
 
 interface TerminalComponentProps {
   tree: NodeType[];
