@@ -13,14 +13,7 @@ import { NodeType } from "@/lib/types";
 import { Terminal as XTerm } from "xterm";
 
 const EditorView = () => {
-    const [tree, setTree] = useState<NodeType[]>([
-        {
-            id: "codaive-root",
-            name: "codaive-web",
-            type: "folder",
-            children: []
-        }
-    ]);
+    const [tree, setTree] = useState<NodeType[]>([]);
     const [selectedFile, setSelectedFile] = useState<NodeType | null>(null);
     const terminalRef = useRef<XTerm | null>(null);
 

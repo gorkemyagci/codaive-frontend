@@ -66,7 +66,6 @@ class InputBuffer {
       this.lines[this.cursorRow] =
         line.slice(0, this.cursorCol) + line.slice(this.cursorCol + 1);
     } else if (this.cursorRow < this.lines.length - 1) {
-      // Merge with next line
       this.lines[this.cursorRow] += this.lines[this.cursorRow + 1];
       this.lines.splice(this.cursorRow + 1, 1);
     }
@@ -126,7 +125,7 @@ interface TerminalComponentProps {
 const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProps) => {
   const xtermRef = useRef<XTerm | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [cwd, setCwd] = useState("/codaive-web");
+  const [cwd, setCwd] = useState("/");
   const inputBuffer = useRef(new InputBuffer());
   const commandHistory = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
@@ -134,92 +133,36 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
 
   useEffect(() => {
     treeRef.current = tree;
+    console.log(tree);
   }, [tree]);
 
-  function findNodeByPath(path: string, nodes: NodeType[]): NodeType | null {
-    const parts = path.split("/").filter(Boolean);
-    let current: NodeType | null = null;
-    let children = nodes;
-    for (const part of parts) {
-      const found = children.find((n) => n.name === part);
-      if (!found) return null;
-      current = found;
-      if (found.type === "folder" && found.children) {
-        children = found.children;
-      } else {
-        children = [];
-      }
-    }
-    return current;
+  function getCwdNode(): NodeType | null {
+    if (cwd === "/") return null;
+    return treeRef.current.find((n) => n.type === "folder" && n.name === cwd.replace(/^\//, "")) || null;
   }
 
-  function getCwdNode(): NodeType | null {
-    if (cwd === "/" || cwd === "/codaive-web") return treeRef.current[0];
-    return findNodeByPath(cwd.replace(/^\//, ""), treeRef.current);
+  function findNodeByPath(path: string, nodes: NodeType[]): NodeType | null {
+    const name = path.split("/").filter(Boolean)[0];
+    if (!name) return null;
+    return nodes.find((n) => n.name === name) || null;
   }
 
   function updateTreeAtPath(path: string, updater: (node: NodeType) => NodeType) {
-    const parts = path.split("/").filter(Boolean);
-    
-    if (parts.length === 0) {
-      setTree((prev) => {
-        if (prev.length === 0) return prev;
-        const newTree = [...prev];
-        newTree[0] = updater(prev[0]);
-        return newTree;
-      });
+    const name = path.split("/").filter(Boolean)[0];
+    if (!name) {
+      setTree((prev) => prev.map(updater));
       return;
     }
-    
-    setTree((prev) => {
-      const newTree = [...prev];
-      
-      function updateNodeInTree(nodes: NodeType[]): NodeType[] {
-        return nodes.map((node) => {
-          if (node.name === parts[0]) {
-            if (parts.length === 1) {
-              return updater(node);
-            } else if (node.type === "folder" && node.children) {
-              const newParts = parts.slice(1);
-              return {
-                ...node,
-                children: updateNodeWithParts(node.children, newParts)
-              };
-            }
-          }
-          return node;
-        });
-      }
-      
-      function updateNodeWithParts(nodes: NodeType[], remainingParts: string[]): NodeType[] {
-        return nodes.map((node) => {
-          if (node.name === remainingParts[0]) {
-            if (remainingParts.length === 1) {
-              return updater(node);
-            } else if (node.type === "folder" && node.children) {
-              return {
-                ...node,
-                children: updateNodeWithParts(node.children, remainingParts.slice(1))
-              };
-            }
-          }
-          return node;
-        });
-      }
-      
-      const result = updateNodeInTree(newTree);
-      return result;
-    });
+    setTree((prev) => prev.map((node) => node.name === name ? updater(node) : node));
   }
 
   useEffect(() => {
     if (!containerRef.current) return;
-    
-    // Add custom scrollbar styles
+
     const styleElement = document.createElement('style');
     styleElement.textContent = scrollbarStyle;
     document.head.appendChild(styleElement);
-    
+
     const fontSize = 14;
     const lineHeight = 1.2;
     const rowHeight = fontSize * lineHeight;
@@ -303,16 +246,16 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
       } else if (domEvent.key === "Tab") {
         const currentInput = inputBuffer.current.value;
         const parts = currentInput.split(" ");
-        
+
         if (parts[0] === "cd" && parts.length === 2 && parts[1].length > 0) {
           const prefix = parts[1];
           const cwdNode = getCwdNode();
-          
+
           if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
             const matches = cwdNode.children
               .filter(n => n.type === "folder" && n.name.startsWith(prefix))
               .map(n => n.name);
-            
+
             if (matches.length === 1) {
               const newInput = `cd ${matches[0]}`;
               inputBuffer.current = new InputBuffer();
@@ -320,13 +263,13 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
                 inputBuffer.current.insert(char);
               }
               redrawInput();
-            } 
+            }
             else if (matches.length > 1) {
               let commonPrefix = matches[0];
               for (let i = 1; i < matches.length; i++) {
                 commonPrefix = findCommonPrefix(commonPrefix, matches[i]);
               }
-              
+
               if (commonPrefix.length > prefix.length) {
                 const newInput = `cd ${commonPrefix}`;
                 inputBuffer.current = new InputBuffer();
@@ -363,7 +306,6 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
     });
 
     xtermRef.current = term;
-    // Update the external ref if provided
     if (terminalRef) {
       terminalRef.current = term;
     }
@@ -374,7 +316,6 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
       if (terminalRef) {
         terminalRef.current = null;
       }
-      // Remove the style element when component unmounts
       styleElement.remove();
     };
   }, [cwd, terminalRef]);
@@ -405,7 +346,9 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
     const cwdNode = getCwdNode();
     switch (cmd) {
       case "ls": {
-        if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
+        if (cwd === "/") {
+          term.writeln(treeRef.current.map((n) => n.name + (n.type === "folder" ? "/" : "")).join("  ") || "");
+        } else if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
           term.writeln(cwdNode.children.map((n) => n.name + (n.type === "folder" ? "/" : "")).join("  ") || "");
         } else {
           term.writeln("Not a directory");
@@ -414,24 +357,29 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
       }
       case "cd": {
         const target = args[0] || "/";
-      
-        if (target === "..") {
-          if (cwd === "/" || cwd === "/codaive-web") {
-            term.writeln("Already at root directory");
+        if (target === ".." || target === "/") {
+          if (cwd === "/" || target === "/") {
+            setCwd("/");
           } else {
-            const parentPath = cwd.split("/").slice(0, -1).join("/") || "/";
-            setCwd(parentPath);
+            const parentPath = cwd.split("/").slice(0, -1).filter(Boolean).join("/");
+            setCwd(parentPath ? "/" + parentPath : "/");
           }
           break;
         }
-        
-        let newPath = target;
-        if (!target.startsWith("/")) {
-          newPath = (cwd === "/" ? "" : cwd) + "/" + target;
-        }
-        const node = findNodeByPath(newPath.replace(/^\//, ""), treeRef.current);
-        if (node && node.type === "folder") {
-          setCwd("/" + newPath.replace(/^\//, ""));
+        if (cwd === "/") {
+          const node = treeRef.current.find((n) => n.type === "folder" && n.name === target.replace(/^\//, ""));
+          if (node) {
+            setCwd("/" + node.name);
+          } else {
+            term.writeln("No such directory: " + target);
+          }
+        } else if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
+          const node = cwdNode.children.find((n) => n.type === "folder" && n.name === target.replace(/^\//, ""));
+          if (node) {
+            setCwd(cwd + "/" + node.name);
+          } else {
+            term.writeln("No such directory: " + target);
+          }
         } else {
           term.writeln("No such directory: " + target);
         }
@@ -440,43 +388,61 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
       case "mkdir": {
         const name = args[0];
         if (!name) return term.writeln("Usage: mkdir <folder>");
-        if (!cwdNode || cwdNode.type !== "folder") return term.writeln("Not a directory");
-        if (cwdNode.children?.some((n) => n.name === name)) return term.writeln("File or folder exists");
-        updateTreeAtPath(cwd.replace(/^\//, ""), (node) => {
-          if (node.type !== "folder") return node;
-          return {
-            ...node,
-            children: [...(node.children || []), { id: Math.random().toString(36), name, type: "folder", children: [] }],
-          };
-        });
+        if (cwd === "/") {
+          if (treeRef.current.some((n) => n.name === name)) return term.writeln("File or folder exists");
+          setTree((prev) => [...prev, { id: Math.random().toString(36), name, type: "folder", children: [] }]);
+        } else if (cwdNode && cwdNode.type === "folder") {
+          if (cwdNode.children?.some((n) => n.name === name)) return term.writeln("File or folder exists");
+          updateTreeAtPath(cwd, (node) => {
+            if (node.type !== "folder") return node;
+            return {
+              ...node,
+              children: [...(node.children || []), { id: Math.random().toString(36), name, type: "folder", children: [] }],
+            };
+          });
+        } else {
+          return term.writeln("Not a directory");
+        }
         setTimeout(() => prompt(term, cwd), 0);
         break;
       }
       case "touch": {
         const name = args[0];
         if (!name) return term.writeln("Usage: touch <file>");
-        if (!cwdNode || cwdNode.type !== "folder") return term.writeln("Not a directory");
-        if (cwdNode.children?.some((n) => n.name === name)) return term.writeln("File or folder exists");
-        updateTreeAtPath(cwd.replace(/^\//, ""), (node) => {
-          if (node.type !== "folder") return node;
-          return {
-            ...node,
-            children: [...(node.children || []), { id: Math.random().toString(36), name, type: "file" }],
-          };
-        });
+        if (cwd === "/") {
+          if (treeRef.current.some((n) => n.name === name)) return term.writeln("File or folder exists");
+          setTree((prev) => [...prev, { id: Math.random().toString(36), name, type: "file" }]);
+        } else if (cwdNode && cwdNode.type === "folder") {
+          if (cwdNode.children?.some((n) => n.name === name)) return term.writeln("File or folder exists");
+          updateTreeAtPath(cwd, (node) => {
+            if (node.type !== "folder") return node;
+            return {
+              ...node,
+              children: [...(node.children || []), { id: Math.random().toString(36), name, type: "file" }],
+            };
+          });
+        } else {
+          return term.writeln("Not a directory");
+        }
         setTimeout(() => prompt(term, cwd), 0);
         break;
       }
       case "rm": {
         const name = args[0];
         if (!name) return term.writeln("Usage: rm <file|folder>");
-        updateTreeAtPath(cwd.replace(/^\//, ""), (node) => {
-          if (node.type !== "folder") return node;
-          return {
-            ...node,
-            children: (node.children || []).filter((n) => n.name !== name),
-          };
-        });
+        if (cwd === "/") {
+          setTree((prev) => prev.filter((n) => n.name !== name));
+        } else if (cwdNode && cwdNode.type === "folder") {
+          updateTreeAtPath(cwd, (node) => {
+            if (node.type !== "folder") return node;
+            return {
+              ...node,
+              children: (node.children || []).filter((n) => n.name !== name),
+            };
+          });
+        } else {
+          return term.writeln("Not a directory");
+        }
         setTimeout(() => prompt(term, cwd), 0);
         break;
       }
@@ -484,11 +450,13 @@ const TerminalComponent = ({ tree, setTree, terminalRef }: TerminalComponentProp
         const name = args[0];
         if (!name) return term.writeln("Usage: cat <file>");
         let file = null;
-        if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
+        if (cwd === "/") {
+          file = treeRef.current.find((n) => n.name === name && n.type === "file");
+        } else if (cwdNode && cwdNode.type === "folder" && cwdNode.children) {
           file = cwdNode.children.find((n) => n.name === name && n.type === "file");
         }
         if (file) {
-          term.writeln(`(empty)`); 
+          term.writeln(`(empty)`);
         } else {
           term.writeln("No such file: " + name);
         }
