@@ -74,7 +74,7 @@ export function CodeComparison({
         });
         setHighlightedBefore(before);
         setHighlightedAfter(after);
-      } catch (error) {
+      } catch {
         setHighlightedBefore(`<pre>${beforeCode}</pre>`);
         setHighlightedAfter(`<pre>${afterCode}</pre>`);
       }
